@@ -1,0 +1,67 @@
+#RandomForest
+
+
+library(terra)
+library(randomForest)
+
+
+H2_field  <- rast("H2_Clipped.tif")
+training  <- vect("training_data.gpkg")
+clip_mask <- vect("clip_mask.gpkg")
+
+if (!all(crs(H2_field) == crs(training))) {
+  training <- project(training, H2_field)
+}
+if (!all(crs(H2_field) == crs(clip_mask))) {
+  clip_mask <- project(clip_mask, H2_field)
+}
+
+
+H2_field[H2_field == 0] <- NA
+H2_field_fieldonly <- mask(H2_field, clip_mask)
+
+
+training_df <- extract(
+  H2_field_fieldonly,
+  training,
+  df    = TRUE,
+  na.rm = TRUE
+)
+
+training_df$class <- factor(training$class[training_df$ID])
+training_df$ID <- NULL
+
+
+set.seed(6)
+
+fit_rf <- randomForest(
+  class ~ .,
+  data  = training_df,
+  ntree = 500,
+  importance = TRUE
+)
+
+fit_rf
+
+
+H2_classified <- predict(
+  H2_field_fieldonly,
+  fit_rf,
+  type      = "response",
+  filename  = "H2_classified_dt_fieldonly.tif",
+  overwrite = TRUE
+)
+
+H2_classified <- mask(H2_classified, clip_mask)
+
+
+plot(H2_classified, main = "Random forest classification")
+
+
+
+
+
+
+
+
+
